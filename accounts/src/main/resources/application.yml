@@ -1,0 +1,124 @@
+server:
+  port: ${PORT:8080}
+
+spring:
+  main:
+    allow-bean-definition-overriding: true
+  application:
+    name: "accounts"
+  profiles:
+    active: '@spring.active.profile@'
+
+  datasource:
+    url: jdbc:mysql://localhost:3306/accountsdb
+    username: root
+    password: root
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+  sql:
+    init:
+      mode: always
+  config:
+    import: "optional:configserver:http://localhost:8071"
+
+  cloud:
+    openfeign:
+      circuitbreaker:
+        enabled: true
+#Refresh configurations at realtime using Spring Cloud Bus
+#  rabbitmq:
+#    host: "localhost"
+#    port: 5672
+#    stream:
+#      username: "guest"
+#      password: "guest"
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"  # enable and expose all management endpoint supported by the spring boot actuator
+  health: # for checking the liveness and readiness of accounts ms to run the gatewayserver in docker compose.
+    readiness-state:
+      enabled: true
+    liveness-state:
+      enabled: true
+
+  endpoint: # when accounts microservice shutdown, It's deregister accounts microservice with eureka server
+    shutdown:
+      enabled: true
+    health:
+      probes:
+        enabled: true
+  info:
+    env:
+      enabled: true # enable info label actuator
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+endpoints: # exposed shutdown related properties
+  shutdown:
+    enabled: true
+
+eureka:
+  instance:
+    prefer-ip-address: true # when my accounts microservice it is trying to register with eureka server by default it will try to register with the hostname. The hostname make sense when you are
+                            # trying to DNS mapping inside your microservices network. But inside my local system there is no DNS setup. We should set `prefer-ip-address: true`.
+                            # my accounts microservice will register with my eureka server by using the ip address. When my other microservices, they are trying to connect with my accounts microservice
+                            # my eureka server is going to share the ip address of my accounts microservice so that other microservice can connect to the accounts' microservice.
+  client:
+    fetchRegistry: true
+    registerWithEureka: true
+    serviceUrl:
+      defaultZone: http://localhost:8070/eureka/
+
+info: # this information we can see it the eureka dashboard. This info information will be exposed as part of an actuator endpoint url & by default the info label actuator is not enabled.
+  app:
+    name: "accounts"
+    description: "Bank accounts application"
+    version: "1.0.0"
+
+logging: # activate the debug logger
+  level:
+    com:
+      akash:
+        accounts: DEBUG
+  pattern:
+    level: "%5p [${spring.application.name},%X{trace_id},%X{span_id}]"
+      # Explanation:
+      # %5p          # Log level (e.g., INFO, DEBUG, ERROR), formatted to a width of 5 characters for alignment.
+      # ${spring.application.name}  # Inserts the name of the current Spring Boot application for identification.
+      # %X{trace_id} # Extracts and includes the trace ID from the Mapped Diagnostic Context (MDC), crucial for distributed tracing.
+      # %X{span_id}  # Extracts and includes the span ID from the MDC, indicating a specific operation within the trace.
+
+resilience4j.circuitbreaker:
+  configs:
+    default:
+      slidingWindowSize: 10 # It will monitor the last 10 requests to decide whether to open or close the circuit.
+      permittedNumberOfCallsInHalfOpenState: 2 # If these 2 calls succeed, the Circuit Breaker will close and normal traffic will resume. If they fail, it will go back to an open state.
+      failureRateThreshold: 50 # If 50% or more of the recorded requests in the sliding window are failures, the Circuit Breaker will open, meaning it will stop making requests to the service.
+      waitDurationInOpenState: 10000 # This defines how long (in milliseconds or 10 seconds) the Circuit Breaker will remain in the open state before transitioning to half-open to test the system again.
+
+resilience4j.retry:
+  configs:
+    default:
+      maxAttempts: 3                   # Maximum number of retry attempts (3 retries)
+      waitDuration: 500                # Wait duration between retries in milliseconds (500ms)
+      enableExponentialBackoff: true   # Enable exponential backoff for retries
+      exponentialBackoffMultiplier: 2  # Multiplier for exponential backoff (doubles the wait time each retry)
+      ignoreExceptions:
+        - java.lang.NullPointerException # Ignore retries for NullPointerException
+      retryExceptions:
+        - java.util.concurrent.TimeoutException # Retry only when TimeoutException occurs
+
+resilience4j.ratelimiter:
+  configs:
+    default:
+      timeoutDuration: 1000        # Timeout (in milliseconds) for acquiring permission. If a request cannot acquire permission within this time, it will be denied.
+      limitRefreshPeriod: 5000     # Interval (in milliseconds) for refreshing the available permissions (5 seconds here).
+      limitForPeriod: 1            # Number of requests allowed per refresh period. Allows 1 request every 5 seconds.
+
+

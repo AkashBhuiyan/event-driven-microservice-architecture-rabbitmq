@@ -1,0 +1,84 @@
+server:
+  port: ${PORT:9000}
+
+spring:
+  main:
+    allow-bean-definition-overriding: true
+  application:
+    name: "cards"
+  profiles:
+    active: '@spring.active.profile@'
+
+  datasource:
+    url: jdbc:mysql://localhost:3308/cardsdb
+    username: root
+    password: root
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+  sql:
+    init:
+      mode: always
+
+  config:
+    import: "optional:configserver:http://localhost:8071"
+#  rabbitmq:
+#    host: "localhost"
+#    port: 5672
+#    stream:
+#      username: "guest"
+#      password: "guest"
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"  # enable and expose all management endpoint supported by the spring boot actuator
+  health: # for checking the liveness and readiness of accounts ms to run the gatewayserver in docker compose.
+    readiness-state:
+      enabled: true
+    liveness-state:
+      enabled: true
+
+  endpoint: # when cards microservice shutdown, It's deregister cards microservice with eureka server
+    shutdown:
+      enabled: true
+    health:
+      probes:
+        enabled: true
+  info:
+    env:
+      enabled: true # enable info label actuator
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+endpoints: # exposed shutdown related properties
+  shutdown:
+    enabled: true
+
+eureka:
+  instance:
+    prefer-ip-address: true # when my cards microservice it is trying to register with eureka server by default it will try to register with the hostname. The hostname make sense when you are
+        # trying to DNS mapping inside your microservices network. But inside my local system there is no DNS setup. We should set `prefer-ip-address: true`.
+      # my cards microservice will register with my eureka server by using the ip address. When my other microservices, they are trying to connect with my cards microservice
+      # my eureka server is going to share the ip address of my cards microservice so that other microservice can connect to the cards' microservice.
+  client:
+    fetchRegistry: true
+    registerWithEureka: true
+    serviceUrl:
+      defaultZone: http://localhost:8070/eureka/
+info: # this information we can see it the eureka dashboard. This info information will be exposed as part of an actuator endpoint url & by default the info label actuator is not enabled.
+  app:
+    name: "cards"
+    description: "Bank cards application"
+    version: "1.0.0"
+
+logging: # activate the debug logger
+  level:
+    com:
+      akash:
+        cards: DEBUG
+  pattern:
+    level: "%5p [${spring.application.name},%X{trace_id},%X{span_id}]"

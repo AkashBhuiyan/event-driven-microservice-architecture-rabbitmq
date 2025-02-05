@@ -1,0 +1,67 @@
+spring:
+  application:
+    name: "gatewayserver"
+  config:
+    import: "optional:configserver:http://localhost:8071"
+  cloud:
+    gateway:
+      discovery:                # The root property for service discovery configuration.
+        locator:                # Configuration related to the discovery locator feature.
+          enabled: false        # This disables the automatic route generation for services from the service registry.
+          lowerCaseServiceId: true  # This ensures that all service IDs are converted to lowercase for consistent routing.
+
+      httpclient: # Configures HTTP client properties used by the application for making HTTP requests.
+        connect-timeout: 1000  # Sets the connection timeout in milliseconds (1000 ms = 1 second). This is the maximum time allowed to establish a connection to a server.
+        response-timeout: 10s  # Specifies the maximum time to wait for a response from the server (microservices), set here as 10 seconds.
+
+  data:
+    redis:
+      connect-timeout: 2s        # Timeout duration for establishing a connection to Redis (2 seconds)
+      host: localhost            # The Redis server's host address (localhost in this case)
+      port: 6379                 # The port Redis server is listening on (default port for Redis is 6379)
+      timeout: 1s                # Timeout duration for reading or writing data from/to Redis (1 second)
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Retrieves the public signing certificates from the authorization server
+          # to validate the incoming JWT tokens in the resource server.
+          jwk-set-uri: "http://localhost:7080/realms/master/protocol/openid-connect/certs"
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"  # enable and expose all management endpoint supported by the spring boot actuator
+  endpoint:
+    gateway:
+      enabled: true
+  info:
+    env:
+      enabled: true # enable info label actuator
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+info: # this information we can see it the eureka dashboard. This info information will be exposed as part of an actuator endpoint url & by default the info label actuator is not enabled.
+  app:
+    name: "gatewayserver"
+    description: "Bank Gateway Server application"
+    version: "1.0.0"
+
+logging: # activate the debug logger
+  level:
+    com:
+      akash:
+        gatewayserver: DEBUG
+  pattern:
+    level: "%5p [${spring.application.name},%X{trace_id},%X{span_id}]"
+
+resilience4j.circuitbreaker:
+  configs:
+    default:
+      slidingWindowSize: 10 # It will monitor the last 10 requests to decide whether to open or close the circuit.
+      permittedNumberOfCallsInHalfOpenState: 2 # If these 2 calls succeed, the Circuit Breaker will close and normal traffic will resume. If they fail, it will go back to an open state.
+      failureRateThreshold: 50 # If 50% or more of the recorded requests in the sliding window are failures, the Circuit Breaker will open, meaning it will stop making requests to the service.
+      waitDurationInOpenState: 10000 # This defines how long (in milliseconds or 10 seconds) the Circuit Breaker will remain in the open state before transitioning to half-open to test the system again.
+
