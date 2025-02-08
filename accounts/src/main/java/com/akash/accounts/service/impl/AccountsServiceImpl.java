@@ -12,7 +12,10 @@ import com.akash.accounts.mapper.CustomerMapper;
 import com.akash.accounts.repository.AccountsRepository;
 import com.akash.accounts.repository.CustomerRepository;
 import com.akash.accounts.service.IAccountsService;
+import com.akash.common.dto.AccountsMsgDto;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.cloud.stream.function.StreamBridge;
 import org.springframework.stereotype.Service;
 
 import java.util.Optional;
@@ -24,10 +27,12 @@ import java.util.Random;
 
 @Service
 @AllArgsConstructor
+@Slf4j
 public class AccountsServiceImpl implements IAccountsService {
 
-    private AccountsRepository accountsRepository;
-    private CustomerRepository customerRepository;
+    private final AccountsRepository accountsRepository;
+    private final CustomerRepository customerRepository;
+    private final StreamBridge streamBridge;
 
     /**
      * @param customerDto - CustomerDto Object
@@ -42,7 +47,16 @@ public class AccountsServiceImpl implements IAccountsService {
                     +customerDto.getMobileNumber());
         }
         Customer savedCustomer = customerRepository.save(customer);
-        accountsRepository.save(createNewAccount(savedCustomer));
+        Accounts savedAccounts = accountsRepository.save(createNewAccount(savedCustomer));
+        sendCommunication(savedAccounts, savedCustomer);
+    }
+
+    private void sendCommunication(Accounts account, Customer customer) {
+        var accountsMsgDto = new AccountsMsgDto(account.getAccountNumber(), customer.getName(),
+                customer.getEmail(), customer.getMobileNumber());
+        log.info("Sending Communication request for the details: {}", accountsMsgDto);
+        var result = streamBridge.send("send-communication-out-0", accountsMsgDto);
+        log.info("Is the Communication request successfully triggered ? : {}", result);
     }
 
     /**

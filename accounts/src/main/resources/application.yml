@@ -27,13 +27,17 @@ spring:
     openfeign:
       circuitbreaker:
         enabled: true
-#Refresh configurations at realtime using Spring Cloud Bus
-#  rabbitmq:
-#    host: "localhost"
-#    port: 5672
-#    stream:
-#      username: "guest"
-#      password: "guest"
+    stream:
+      bindings:
+        send-communication-out-0:
+          destination: send-communication
+
+  rabbitmq:
+    host: "localhost"
+    port: 5672
+    username: "guest"
+    password: "guest"
+    connection-timeout: 10s
 
 management:
   endpoints:
