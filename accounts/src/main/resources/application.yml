@@ -27,8 +27,13 @@ spring:
     openfeign:
       circuitbreaker:
         enabled: true
+    function:
+      definition: updateCommunication
     stream:
       bindings:
+        updateCommunication-in-0:
+          destination: communication-sent
+          group: ${spring.application.name}
         send-communication-out-0:
           destination: send-communication
 
